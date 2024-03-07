@@ -8,6 +8,7 @@ from typing import Dict, Set, List
 from collections import defaultdict
 
 import numpy as np
+from mlagents.optuna_utils.optuna_run import TrialEvalCallback
 
 from mlagents_envs.logging_util import get_logger
 from mlagents.trainers.env_manager import EnvManager, EnvironmentStep
@@ -94,7 +95,7 @@ class TrainerController:
             )
 
     @timed
-    def _reset_env(self, env_manager: EnvManager) -> None:
+    def _reset_env(self, env_manager: EnvManager, trial_eval: TrialEvalCallback = None) -> None:
         """Resets the environment.
 
         Returns:
@@ -104,7 +105,7 @@ class TrainerController:
         new_config = self.param_manager.get_current_samplers()
         env_manager.reset(config=new_config)
         # Register any new behavior ids that were generated on the reset.
-        self._register_new_behaviors(env_manager, env_manager.first_step_infos)
+        self._register_new_behaviors(env_manager, env_manager.first_step_infos, trial_eval)
 
     def _not_done_training(self) -> bool:
         return (
@@ -113,7 +114,8 @@ class TrainerController:
         ) or len(self.trainers) == 0
 
     def _create_trainer_and_manager(
-        self, env_manager: EnvManager, name_behavior_id: str
+        self, env_manager: EnvManager, name_behavior_id: str, 
+        trial_eval: TrialEvalCallback = None
     ) -> None:
 
         parsed_behavior_id = BehaviorIdentifiers.from_name_behavior_id(name_behavior_id)
@@ -127,7 +129,7 @@ class TrainerController:
             if trainer.threaded:
                 # Only create trainer thread for new trainers
                 trainerthread = threading.Thread(
-                    target=self.trainer_update_func, args=(trainer,), daemon=True
+                    target=self.trainer_update_func, args=(trainer, trial_eval,), daemon=True
                 )
                 self.trainer_threads.append(trainerthread)
             env_manager.on_training_started(
@@ -159,22 +161,23 @@ class TrainerController:
             trainerthread.start()
 
     def _create_trainers_and_managers(
-        self, env_manager: EnvManager, behavior_ids: Set[str]
+        self, env_manager: EnvManager, behavior_ids: Set[str], 
+        trial_eval: TrialEvalCallback = None
     ) -> None:
         for behavior_id in behavior_ids:
-            self._create_trainer_and_manager(env_manager, behavior_id)
+            self._create_trainer_and_manager(env_manager, behavior_id, trial_eval)
 
     @timed
-    def start_learning(self, env_manager: EnvManager) -> None:
+    def start_learning(self, env_manager: EnvManager, trial_eval: TrialEvalCallback = None) -> None:
         self._create_output_path(self.output_path)
         try:
             # Initial reset
-            self._reset_env(env_manager)
+            self._reset_env(env_manager, trial_eval)
             self.param_manager.log_current_lesson()
             while self._not_done_training():
-                n_steps = self.advance(env_manager)
+                n_steps = self.advance(env_manager, trial_eval)
                 for _ in range(n_steps):
-                    self.reset_env_if_ready(env_manager)
+                    self.reset_env_if_ready(env_manager, trial_eval)
             # Stop advancing trainers
             self.join_threads()
         except (
@@ -205,7 +208,7 @@ class TrainerController:
         for trainer in self.trainers.values():
             trainer.end_episode()
 
-    def reset_env_if_ready(self, env: EnvManager) -> None:
+    def reset_env_if_ready(self, env: EnvManager, trial_eval: TrialEvalCallback = None) -> None:
         # Get the sizes of the reward buffers.
         reward_buff = {k: list(t.reward_buffer) for (k, t) in self.trainers.items()}
         curr_step = {k: int(t.get_step) for (k, t) in self.trainers.items()}
@@ -221,17 +224,17 @@ class TrainerController:
         # If ghost trainer swapped teams
         ghost_controller_reset = self.ghost_controller.should_reset()
         if param_must_reset or ghost_controller_reset:
-            self._reset_env(env)  # This reset also sends the new config to env
+            self._reset_env(env, trial_eval)  # This reset also sends the new config to env
             self.end_trainer_episodes()
         elif updated:
             env.set_env_parameters(self.param_manager.get_current_samplers())
 
     @timed
-    def advance(self, env_manager: EnvManager) -> int:
+    def advance(self, env_manager: EnvManager, trial_eval: TrialEvalCallback = None) -> int:
         # Get steps
         with hierarchical_timer("env_step"):
             new_step_infos = env_manager.get_steps()
-            self._register_new_behaviors(env_manager, new_step_infos)
+            self._register_new_behaviors(env_manager, new_step_infos, trial_eval)
             num_steps = env_manager.process_steps(new_step_infos)
 
         # Report current lesson for each environment parameter
@@ -243,16 +246,16 @@ class TrainerController:
                 trainer.stats_reporter.set_stat(
                     f"Environment/Lesson Number/{param_name}", lesson_number
                 )
-
         for trainer in self.trainers.values():
             if not trainer.threaded:
                 with hierarchical_timer("trainer_advance"):
-                    trainer.advance()
+                    trainer.advance(trial_eval)
 
         return num_steps
 
     def _register_new_behaviors(
-        self, env_manager: EnvManager, step_infos: List[EnvironmentStep]
+        self, env_manager: EnvManager, step_infos: List[EnvironmentStep],
+        trial_eval: TrialEvalCallback = None
     ) -> None:
         """
         Handle registration (adding trainers and managers) of new behaviors ids.
@@ -264,7 +267,7 @@ class TrainerController:
         for s in step_infos:
             step_behavior_ids |= set(s.name_behavior_ids)
         new_behavior_ids = step_behavior_ids - self.registered_behavior_ids
-        self._create_trainers_and_managers(env_manager, new_behavior_ids)
+        self._create_trainers_and_managers(env_manager, new_behavior_ids, trial_eval)
         self.registered_behavior_ids |= step_behavior_ids
 
     def join_threads(self, timeout_seconds: float = 1.0) -> None:
@@ -291,7 +294,7 @@ class TrainerController:
                     )
                     merge_gauges(thread_timer_stack.gauges)
 
-    def trainer_update_func(self, trainer: Trainer) -> None:
+    def trainer_update_func(self, trainer: Trainer, trial_eval: TrialEvalCallback = None) -> None:
         while not self.kill_trainers:
             with hierarchical_timer("trainer_advance"):
-                trainer.advance()
+                trainer.advance(trial_eval)

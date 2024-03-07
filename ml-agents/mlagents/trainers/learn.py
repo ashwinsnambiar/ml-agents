@@ -8,6 +8,13 @@ import json
 
 from typing import Callable, Optional, List
 
+import optuna
+from optuna.pruners import MedianPruner
+from optuna.samplers import TPESampler
+from optuna.visualization import plot_optimization_history, plot_param_importances
+from mlagents.optuna_utils.optuna_run import update_config_file, TrialEvalCallback
+from mlagents.trainers.cli_utils import StoreConfigFile
+
 import mlagents.trainers
 import mlagents_envs
 from mlagents.trainers.trainer_controller import TrainerController
@@ -37,6 +44,17 @@ from mlagents.plugins.trainer_type import register_trainer_plugins
 
 logger = logging_util.get_logger(__name__)
 
+#constants for the optimisation run
+#todo: edit the constants. also N_EVALUATIONS = 2 define in optuna.py too
+N_TRIALS = 4  # Maximum number of trials
+#TIMEOUT = int(60 * 15)  # 15 minutes
+N_JOBS = 1 # Number of jobs to run in parallel
+SHOW_PROGRESS_BAR = False
+N_STARTUP_TRIALS = 5  # Stop random sampling after N_STARTUP_TRIALS
+N_EVALUATIONS = 4  # Number of evaluations during the training
+N_EVAL_ENVS = 5
+N_EVAL_EPISODES = 10
+
 TRAINING_STATUS_FILE_NAME = "training_status.json"
 
 
@@ -50,13 +68,18 @@ def get_version_string() -> str:
 
 def parse_command_line(
     argv: Optional[List[str]] = None,
-) -> RunOptions:
+):
     _, _ = register_trainer_plugins()
     args = parser.parse_args(argv)
-    return RunOptions.from_argparse(args)
+    return args
 
 
-def run_training(run_seed: int, options: RunOptions, num_areas: int) -> None:
+def run_training(
+        run_seed: int, 
+        options: RunOptions, 
+        num_areas: int, 
+        trial_eval: TrialEvalCallback = None
+        ) -> None:
     """
     Launches training session.
     :param run_seed: Random seed used for training.
@@ -135,7 +158,8 @@ def run_training(run_seed: int, options: RunOptions, num_areas: int) -> None:
 
     # Begin training
     try:
-        tc.start_learning(env_manager)
+        print("Inside start_learning ", trial_eval.trial.number)
+        tc.start_learning(env_manager, trial_eval)
     finally:
         env_manager.close()
         write_run_options(checkpoint_settings.write_path, options)
@@ -205,8 +229,9 @@ def create_environment_factory(
     return create_unity_environment
 
 
-def run_cli(options: RunOptions) -> None:
+def run_cli(options: RunOptions, trial_eval: TrialEvalCallback = None) -> None:
     try:
+        print("inside run_cli ", trial_eval.trial.number)
         print(
             """
             ┐  ╖
@@ -263,11 +288,105 @@ def run_cli(options: RunOptions) -> None:
     if options.env_settings.seed == -1:
         run_seed = np.random.randint(0, 10000)
         logger.debug(f"run_seed set to {run_seed}")
-    run_training(run_seed, options, num_areas)
+    run_training(run_seed, options, num_areas, trial_eval)
+
+def objective(trial: optuna.Trial, args) -> float:
+    # Updating the config file with the current trial hyperparamters
+    update_config_file(trial, StoreConfigFile.trainer_config_path)
+    trial_eval = TrialEvalCallback(trial)
+
+    #todo: how to initialize the first run with given config file parameters?? 
+    
+    nan_encountered = False
+    try:
+        options = RunOptions.from_argparse(args)
+        print(trial._trial_id)
+        print(trial.number)
+        run_id = [options.checkpoint_settings.run_id, str(trial.number)]
+        options.checkpoint_settings.run_id = '_'.join(run_id)
+        
+        print(options.checkpoint_settings.run_id) 
+        # Return execution to learn.py and continue the training with trial hyperparameters
+        run_cli(options, trial_eval)
+    except AssertionError as error:
+        # Sometimes, random hyperparams can generate NaN
+        print(error)
+        nan_encountered = True
+
+    # Tell the optimizer that the trial failed
+    if nan_encountered:
+        return float("nan")
+    print("before should prune in objective")
+    if trial_eval.is_pruned():
+        print(trial_eval.is_pruned())
+        print("in should prune in objective")
+        raise optuna.exceptions.TrialPruned()
+    print("after should prune in objective")
+    print(f"{options.checkpoint_settings.run_id} is {trial.user_attrs['last_mean_reward']}")
+    return trial.user_attrs['last_mean_reward']
+
+
+def start_optuna_tuning(args):
+    """
+    Takes the parsed command line arguments as input and starts the optuna study.
+    It tries to maximise the mean reward of the trial runs by optimising the pre-defined 
+    hyperparameters
+    """
+    # Select the sampler, can be random, TPESampler, CMAES, ...
+    sampler = TPESampler(n_startup_trials=N_STARTUP_TRIALS)
+    # Do not prune before 1/3 of the max budget is used
+    pruner = MedianPruner(
+        n_startup_trials=N_STARTUP_TRIALS, n_warmup_steps=N_EVALUATIONS // 3
+    )
+    storage_url = "sqlite:///results/optuna/trial1.db"
+    #study_name = "PPO_Hyperparammeters"
+    # Create the study and start the hyperparameter optimization
+    study = optuna.create_study(storage_url, sampler, pruner, direction="maximize")
+
+    try:
+        study.optimize(
+            lambda trial: objective(trial, args), 
+            n_trials=N_TRIALS, 
+            n_jobs=N_JOBS,
+            timeout=None, 
+            show_progress_bar=SHOW_PROGRESS_BAR
+            )
+    except KeyboardInterrupt:
+        pass
+
+    print("Number of finished trials: ", len(study.trials))
+
+    print("Best trial:")
+    trial = study.best_trial
+
+    print(f"  Value: {trial.value}")
+
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print(f"    {key}: {value}")
+
+    print("  User attrs:")
+    for key, value in trial.user_attrs.items():
+        print(f"    {key}: {value}")
+
+    #todo: Write report 
+    #study.trials_dataframe().to_csv("study_results_a2c_cartpole.csv")
+
+    fig1 = plot_optimization_history(study)
+    fig2 = plot_param_importances(study)
+
+    fig1.show()
+    fig2.show()
 
 
 def main():
-    run_cli(parse_command_line())
+    print("In main()")
+    args = parse_command_line()
+    print("returned to main()")
+    if args.optuna_tuning:
+        start_optuna_tuning(args)
+    else:
+        run_cli(RunOptions.from_argparse(args))
 
 
 # For python debugger to directly run this script

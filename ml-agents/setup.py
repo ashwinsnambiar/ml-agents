@@ -62,7 +62,7 @@ setup(
         "Pillow>=4.2.1",
         "protobuf>=3.6,<3.20",
         "pyyaml>=3.1.0",
-        "torch>=2.1.1",
+        "torch>=1.13.1",
         "tensorboard>=2.14",
         # adding six explicit dependency since tensorboard needs it but doesn't declare it as a dep
         "six>=1.16",
@@ -73,8 +73,9 @@ setup(
         "huggingface_hub>=0.14",
         'pypiwin32==223;platform_system=="Windows"',
         "onnx==1.12.0",
+        "optuna==3.5.0"
     ],
-    python_requires=">=3.10.1,<=3.10.12",
+    python_requires=">=3.10.1,<=3.10.13",
     entry_points={
         "console_scripts": [
             "mlagents-learn=mlagents.trainers.learn:main",

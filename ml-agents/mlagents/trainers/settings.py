@@ -639,6 +639,7 @@ class TrainerSettings(ExportableSettings):
     threaded: bool = False
     self_play: Optional[SelfPlaySettings] = None
     behavioral_cloning: Optional[BehavioralCloningSettings] = None
+    optuna_tuning: bool = attr.ib(default=parser.get_default("optuna_tuning"))
 
     cattr.register_structure_hook_func(
         lambda t: t == Dict[RewardSignalType, RewardSignalSettings],

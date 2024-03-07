@@ -3,6 +3,8 @@ from typing import List, Deque, Dict
 import abc
 from collections import deque
 
+from mlagents.optuna_utils.optuna_run import TrialEvalCallback
+
 from mlagents_envs.logging_util import get_logger
 from mlagents_envs.base_env import BehaviorSpec
 from mlagents.trainers.stats import StatsReporter
@@ -41,6 +43,7 @@ class Trainer(abc.ABC):
         self._threaded = trainer_settings.threaded
         self._stats_reporter = StatsReporter(brain_name)
         self.is_training = training
+        self.is_pruned = False
         self.load = load
         self._reward_buffer: Deque[float] = deque(maxlen=reward_buff_cap)
         self.policy_queues: List[AgentManagerQueue[Policy]] = []
@@ -96,7 +99,7 @@ class Trainer(abc.ABC):
         stop training if it wasn't training to begin with, or if max_steps
         is reached.
         """
-        return self.is_training and self.get_step <= self.get_max_steps
+        return self.is_training and self.get_step <= self.get_max_steps and not self.is_pruned
 
     @property
     def reward_buffer(self) -> Deque[float]:
@@ -152,7 +155,7 @@ class Trainer(abc.ABC):
         return self.policies[name_behavior_id]
 
     @abc.abstractmethod
-    def advance(self) -> None:
+    def advance(self, trial_eval: TrialEvalCallback = None) -> None:
         """
         Advances the trainer. Typically, this means grabbing trajectories
         from all subscribed trajectory queues (self.trajectory_queues), and updating

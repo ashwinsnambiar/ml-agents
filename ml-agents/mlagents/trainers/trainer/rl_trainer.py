@@ -5,6 +5,8 @@ import abc
 import time
 import attr
 import numpy as np
+
+from mlagents.optuna_utils.optuna_run import TrialEvalCallback
 from mlagents_envs.side_channel.stats_side_channel import StatsAggregationMethod
 
 from mlagents.trainers.policy.checkpoint_manager import (
@@ -275,10 +277,11 @@ class RLTrainer(Trainer):
                 )
                 self._has_warned_group_rewards = True
 
-    def advance(self) -> None:
+    def advance(self, trial_eval: TrialEvalCallback = None) -> None:
         """
         Steps the trainer, taking in trajectories and updates if ready.
         Will block and wait briefly if there are no trajectories.
+        Also has the callback function to evaluate the optuna trials.
         """
         with hierarchical_timer("process_trajectory"):
             for traj_queue in self.trajectory_queues:
@@ -296,6 +299,19 @@ class RLTrainer(Trainer):
                 if self.threaded and not _queried:
                     # Yield thread to avoid busy-waiting
                     time.sleep(0.0001)
+        """
+        The trial evaluation function for pruning is called. If it returns true, the 
+        is_pruned attribute is set to true and it is used in the should_still_train()
+        method of the parent Trainer class to determine whether to stop training.
+        """
+        # print("insiide advance ", trial.number)
+        if trial_eval != None:
+            # print("inside adance if statemnt")
+            curr_mean_reward = self.stats_reporter.get_stats_summaries("Environment/Cumulative Reward").mean
+            # print("curr ", curr_mean_reward)
+            # print(self.get_step)
+            self.is_pruned = trial_eval.trial_eval_callback(self.get_step, self.get_max_steps, curr_mean_reward)
+            print("is pruned value in advance ", self.is_pruned)
         if self.should_still_train:
             if self._is_ready_update():
                 with hierarchical_timer("_update_policy"):
@@ -303,3 +319,9 @@ class RLTrainer(Trainer):
                         for q in self.policy_queues:
                             # Get policies that correspond to the policy queue in question
                             q.put(self.get_policy(q.behavior_id))
+        elif trial_eval!= None:
+            print("inside adance elif statemnt")
+            last_mean_reward = self.stats_reporter.get_stats_summaries("Environment/Cumulative Reward").mean
+            print(last_mean_reward)
+            trial_eval.trial.set_user_attr('last_mean_reward', last_mean_reward)
+            print(trial_eval.trial.user_attrs['last_mean_reward'])

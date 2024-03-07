@@ -240,6 +240,13 @@ def _create_parser() -> argparse.ArgumentParser:
         action=DetectDefault,
     )
 
+    argparser.add_argument(
+        "--optuna-tuning",
+        default=False,
+        help="Set to True to auto tune the hyperparameters of any behaviors with optuna",
+        action=DetectDefault,
+    )
+
     eng_conf = argparser.add_argument_group(title="Engine Configuration")
     eng_conf.add_argument(
         "--width",
