@@ -46,12 +46,12 @@ logger = logging_util.get_logger(__name__)
 
 #constants for the optimisation run
 #todo: edit the constants. also N_EVALUATIONS = 2 define in optuna.py too
-N_TRIALS = 4  # Maximum number of trials
+N_TRIALS = 100  # Maximum number of trials
 #TIMEOUT = int(60 * 15)  # 15 minutes
 N_JOBS = 1 # Number of jobs to run in parallel
 SHOW_PROGRESS_BAR = False
 N_STARTUP_TRIALS = 5  # Stop random sampling after N_STARTUP_TRIALS
-N_EVALUATIONS = 4  # Number of evaluations during the training
+N_EVALUATIONS = 5  # Number of evaluations during the training
 N_EVAL_ENVS = 5
 N_EVAL_EPISODES = 10
 
@@ -158,7 +158,7 @@ def run_training(
 
     # Begin training
     try:
-        print("Inside start_learning ", trial_eval.trial.number)
+        # print("Inside start_learning ", trial_eval.trial.number)
         tc.start_learning(env_manager, trial_eval)
     finally:
         env_manager.close()
@@ -231,7 +231,7 @@ def create_environment_factory(
 
 def run_cli(options: RunOptions, trial_eval: TrialEvalCallback = None) -> None:
     try:
-        print("inside run_cli ", trial_eval.trial.number)
+        # print("inside run_cli ", trial_eval.trial.number)
         print(
             """
             ┐  ╖
@@ -300,12 +300,12 @@ def objective(trial: optuna.Trial, args) -> float:
     nan_encountered = False
     try:
         options = RunOptions.from_argparse(args)
-        print(trial._trial_id)
-        print(trial.number)
+        # print(trial._trial_id)
+        # print(trial.number)
         run_id = [options.checkpoint_settings.run_id, str(trial.number)]
         options.checkpoint_settings.run_id = '_'.join(run_id)
         
-        print(options.checkpoint_settings.run_id) 
+        # print(options.checkpoint_settings.run_id) 
         # Return execution to learn.py and continue the training with trial hyperparameters
         run_cli(options, trial_eval)
     except AssertionError as error:
@@ -316,13 +316,13 @@ def objective(trial: optuna.Trial, args) -> float:
     # Tell the optimizer that the trial failed
     if nan_encountered:
         return float("nan")
-    print("before should prune in objective")
+    # print("before should prune in objective")
     if trial_eval.is_pruned():
-        print(trial_eval.is_pruned())
-        print("in should prune in objective")
+        # print(trial_eval.is_pruned())
+        # print("in should prune in objective")
         raise optuna.exceptions.TrialPruned()
-    print("after should prune in objective")
-    print(f"{options.checkpoint_settings.run_id} is {trial.user_attrs['last_mean_reward']}")
+    # print("after should prune in objective")
+    # print(f"{options.checkpoint_settings.run_id} is {trial.user_attrs['last_mean_reward']}")
     return trial.user_attrs['last_mean_reward']
 
 
@@ -380,9 +380,9 @@ def start_optuna_tuning(args):
 
 
 def main():
-    print("In main()")
+    # print("In main()")
     args = parse_command_line()
-    print("returned to main()")
+    # print("returned to main()")
     if args.optuna_tuning:
         start_optuna_tuning(args)
     else:

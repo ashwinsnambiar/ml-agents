@@ -311,7 +311,7 @@ class RLTrainer(Trainer):
             # print("curr ", curr_mean_reward)
             # print(self.get_step)
             self.is_pruned = trial_eval.trial_eval_callback(self.get_step, self.get_max_steps, curr_mean_reward)
-            print("is pruned value in advance ", self.is_pruned)
+            # print("is pruned value in advance ", self.is_pruned)
         if self.should_still_train:
             if self._is_ready_update():
                 with hierarchical_timer("_update_policy"):
@@ -320,8 +320,8 @@ class RLTrainer(Trainer):
                             # Get policies that correspond to the policy queue in question
                             q.put(self.get_policy(q.behavior_id))
         elif trial_eval!= None:
-            print("inside adance elif statemnt")
+            # print("inside adance elif statemnt")
             last_mean_reward = self.stats_reporter.get_stats_summaries("Environment/Cumulative Reward").mean
-            print(last_mean_reward)
+            # print(last_mean_reward)
             trial_eval.trial.set_user_attr('last_mean_reward', last_mean_reward)
-            print(trial_eval.trial.user_attrs['last_mean_reward'])
+            # print(trial_eval.trial.user_attrs['last_mean_reward'])
