@@ -1,4 +1,5 @@
 # # Unity ML-Agents Toolkit
+import pickle
 from mlagents import torch_utils
 import yaml
 
@@ -54,7 +55,6 @@ N_STARTUP_TRIALS = 5  # Stop random sampling after N_STARTUP_TRIALS
 N_EVALUATIONS = 5  # Number of evaluations during the training
 N_EVAL_ENVS = 5
 N_EVAL_EPISODES = 10
-
 TRAINING_STATUS_FILE_NAME = "training_status.json"
 
 
@@ -339,20 +339,25 @@ def start_optuna_tuning(args):
         n_startup_trials=N_STARTUP_TRIALS, n_warmup_steps=N_EVALUATIONS // 3
     )
     storage_url = "sqlite:///results/optuna/trial1.db"
-    #study_name = "PPO_Hyperparammeters"
+    
+    study_name = "PPO_Hyperparameters"
     # Create the study and start the hyperparameter optimization
-    study = optuna.create_study(storage_url, sampler, pruner, direction="maximize")
+    study = optuna.create_study(storage_url, sampler, pruner, study_name, 
+                                direction="maximize", load_if_exists=True)
 
     try:
         study.optimize(
             lambda trial: objective(trial, args), 
             n_trials=N_TRIALS, 
             n_jobs=N_JOBS,
-            timeout=None, 
             show_progress_bar=SHOW_PROGRESS_BAR
             )
     except KeyboardInterrupt:
+        # saving sampler, to restore later if needed. Code to be added later.
+        with open("/results/optuna/sampler.pkl", "wb") as fout:
+            pickle.dump(study.sampler, fout)
         pass
+
 
     print("Number of finished trials: ", len(study.trials))
 

@@ -37,7 +37,7 @@ def update_config_file(trial: optuna.Trial, path):
     #todo: stop writing it alphabetically
 
     with open(path, 'w') as config_file:
-        yaml.dump(data, config_file)
+        yaml.dump(data, config_file, sort_keys=False)
         config_file.close()
 
 
