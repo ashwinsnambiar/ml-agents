@@ -30,6 +30,7 @@ from mlagents.trainers.behavior_id_utils import BehaviorIdentifiers
 from mlagents.trainers.agent_processor import AgentManager
 from mlagents import torch_utils
 from mlagents.torch_utils.globals import get_rank
+from mlagents.trainers.stats import StatsReporter
 
 
 class TrainerController:
@@ -293,6 +294,7 @@ class TrainerController:
                         is_parallel=True,
                     )
                     merge_gauges(thread_timer_stack.gauges)
+        StatsReporter.remove_writers()
 
     def trainer_update_func(self, trainer: Trainer, trial_eval: TrialEvalCallback = None) -> None:
         while not self.kill_trainers:

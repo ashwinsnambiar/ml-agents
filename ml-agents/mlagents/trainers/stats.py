@@ -285,6 +285,11 @@ class TensorboardWriter(StatsWriter):
                 self.summary_writers[category].add_text("Hyperparameters", summary)
                 self.summary_writers[category].flush()
 
+    def close_writers(self):
+        for summary_writer in self.summary_writers.values():
+            print("closing")
+            summary_writer.close()
+
 
 class StatsReporter:
     writers: List[StatsWriter] = []
@@ -391,3 +396,9 @@ class StatsReporter:
             full_dist=stat_values,
             aggregation_method=StatsReporter.stats_aggregation[self.category][key],
         )
+    
+    def remove_writers():
+        for writer in StatsReporter.writers:
+                if isinstance(writer, TensorboardWriter):
+                    writer.close_writers()
+        StatsReporter.writers = []

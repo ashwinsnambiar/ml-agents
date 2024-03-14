@@ -338,7 +338,7 @@ def start_optuna_tuning(args):
     pruner = MedianPruner(
         n_startup_trials=N_STARTUP_TRIALS, n_warmup_steps=N_EVALUATIONS // 3
     )
-    storage_url = "sqlite:///results/optuna/trial1.db"
+    storage_url = "sqlite:///results/opt1/trial1.db"
     
     study_name = "PPO_Hyperparameters"
     # Create the study and start the hyperparameter optimization
@@ -354,7 +354,7 @@ def start_optuna_tuning(args):
             )
     except KeyboardInterrupt:
         # saving sampler, to restore later if needed. Code to be added later.
-        with open("/results/optuna/sampler.pkl", "wb") as fout:
+        with open("/results/opt1/sampler.pkl", "wb") as fout:
             pickle.dump(study.sampler, fout)
         pass
 
