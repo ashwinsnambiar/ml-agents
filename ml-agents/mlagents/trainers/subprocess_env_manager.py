@@ -105,13 +105,25 @@ class UnityEnvWorker:
 
     def request_close(self):
         try:
+            print(self.conn)
             self.conn.send(EnvironmentRequest(EnvironmentCommand.CLOSE))
+            # print(self.conn)
+            # self.process.join()
+            # print(self.conn)
+            # self.conn.close()
+            # print(self.conn)
+            # print(self.process.is_alive())
         except (BrokenPipeError, EOFError):
             logger.debug(
                 f"UnityEnvWorker {self.worker_id} got exception trying to close."
             )
             pass
 
+    # def close_process(self):
+    #     try:
+    #         self.process.close()
+    #     except:
+    #         print("error in closing process")
 
 def worker(
     parent_conn: Connection,
@@ -496,6 +508,8 @@ class SubprocessEnvManager(EnvManager):
                 pass
         self.step_queue.close()
         # Sanity check to kill zombie workers and report an issue if they occur.
+        if env_worker.process.is_alive():
+            print("is alive")
         if self.workers_alive > 0:
             logger.error("SubprocessEnvManager had workers that didn't signal shutdown")
             for env_worker in self.env_workers:

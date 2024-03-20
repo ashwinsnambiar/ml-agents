@@ -38,6 +38,7 @@ from mlagents_envs.timers import (
     hierarchical_timer,
     get_timer_tree,
     add_metadata as add_timer_metadata,
+    reset_timers
 )
 from mlagents_envs import logging_util
 from mlagents.plugins.stats_writer import register_stats_writer_plugins
@@ -158,7 +159,6 @@ def run_training(
 
     # Begin training
     try:
-        # print("Inside start_learning ", trial_eval.trial.number)
         tc.start_learning(env_manager, trial_eval)
     finally:
         env_manager.close()
@@ -308,6 +308,7 @@ def objective(trial: optuna.Trial, args) -> float:
         # print(options.checkpoint_settings.run_id) 
         # Return execution to learn.py and continue the training with trial hyperparameters
         run_cli(options, trial_eval)
+        reset_timers()
     except AssertionError as error:
         # Sometimes, random hyperparams can generate NaN
         print(error)
@@ -354,7 +355,7 @@ def start_optuna_tuning(args):
             )
     except KeyboardInterrupt:
         # saving sampler, to restore later if needed. Code to be added later.
-        with open("/results/opt1/sampler.pkl", "wb") as fout:
+        with open("results/opt1/sampler.pkl", 'wb') as fout:
             pickle.dump(study.sampler, fout)
         pass
 

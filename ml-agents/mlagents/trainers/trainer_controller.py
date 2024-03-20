@@ -199,9 +199,9 @@ class TrainerController:
                 # If the environment failed, we want to make sure to raise
                 # the exception so we exit the process with an return code of 1.
                 raise ex
-        finally:
-            if self.train_model:
-                self._save_models()
+        # finally:
+        #     if self.train_model:
+        #         self._save_models()
 
     def end_trainer_episodes(self) -> None:
         # Reward buffers reset takes place only for curriculum learning
