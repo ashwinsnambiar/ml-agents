@@ -59,6 +59,7 @@ class RLTrainer(Trainer):
             self.trainer_settings, self.artifact_path, self.load
         )
         self._has_warned_group_rewards = False
+        self.last_mean_reward = 0.0
 
     def end_episode(self) -> None:
         """
@@ -307,11 +308,16 @@ class RLTrainer(Trainer):
         # print("insiide advance ", trial.number)
         if trial_eval != None:
             # print("inside adance if statemnt")
-            curr_mean_reward = self.stats_reporter.get_stats_summaries("Environment/Cumulative Reward").mean
+            curr_mean_reward = self._policy_mean_reward()
+            # print("Curr reward ", curr_mean_reward)
+            if curr_mean_reward is not None:
+                self.last_mean_reward = curr_mean_reward
+                # print("Last reward ", self.last_mean_reward)
             # print("curr ", curr_mean_reward)
             # print(self.get_step)
-            self.is_pruned = trial_eval.trial_eval_callback(self.get_step, self.get_max_steps, curr_mean_reward)
+            self.is_pruned = trial_eval.trial_eval_callback(self.get_step, self.get_max_steps, self.last_mean_reward)
             # print("is pruned value in advance ", self.is_pruned)
+            trial_eval.trial.set_user_attr('last_mean_reward', self.last_mean_reward)
         if self.should_still_train:
             if self._is_ready_update():
                 with hierarchical_timer("_update_policy"):
@@ -319,9 +325,9 @@ class RLTrainer(Trainer):
                         for q in self.policy_queues:
                             # Get policies that correspond to the policy queue in question
                             q.put(self.get_policy(q.behavior_id))
-        elif trial_eval!= None:
-            # print("inside adance elif statemnt")
-            last_mean_reward = self.stats_reporter.get_stats_summaries("Environment/Cumulative Reward").mean
-            # print(last_mean_reward)
-            trial_eval.trial.set_user_attr('last_mean_reward', last_mean_reward)
-            # print(trial_eval.trial.user_attrs['last_mean_reward'])
+        # elif trial_eval!= None:
+        #     # print("inside adance elif statemnt")
+        #     last_mean_reward = self.stats_reporter.get_stats_summaries("Environment/Cumulative Reward").mean
+        #     # print(last_mean_reward)
+        #     trial_eval.trial.set_user_attr('last_mean_reward', last_mean_reward)
+        #     # print(trial_eval.trial.user_attrs['last_mean_reward'])

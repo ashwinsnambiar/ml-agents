@@ -323,7 +323,7 @@ def objective(trial: optuna.Trial, args) -> float:
         # print("in should prune in objective")
         raise optuna.exceptions.TrialPruned()
     # print("after should prune in objective")
-    # print(f"{options.checkpoint_settings.run_id} is {trial.user_attrs['last_mean_reward']}")
+    print(f"{options.checkpoint_settings.run_id} is {trial.user_attrs['last_mean_reward']}")
     return trial.user_attrs['last_mean_reward']
 
 
@@ -343,8 +343,9 @@ def start_optuna_tuning(args):
     
     study_name = "PPO_Hyperparameters"
     # Create the study and start the hyperparameter optimization
-    study = optuna.create_study(storage_url, sampler, pruner, study_name, 
-                                direction="maximize", load_if_exists=True)
+    study = optuna.create_study(storage=storage_url, sampler=sampler, pruner=pruner, 
+                                study_name=study_name, direction="maximize", 
+                                load_if_exists=True)
 
     try:
         study.optimize(

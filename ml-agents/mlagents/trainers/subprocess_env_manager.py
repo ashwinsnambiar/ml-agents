@@ -107,6 +107,7 @@ class UnityEnvWorker:
         try:
             print(self.conn)
             self.conn.send(EnvironmentRequest(EnvironmentCommand.CLOSE))
+            #todo: check if its required?
             # print(self.conn)
             # self.process.join()
             # print(self.conn)
