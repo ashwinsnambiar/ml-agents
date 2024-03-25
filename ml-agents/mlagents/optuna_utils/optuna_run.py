@@ -39,7 +39,7 @@ def update_config_file(trial: optuna.Trial, path):
         hyperparameters['buffer_size'] = hyperparameters_dict['buffer_size']
         hyperparameters['learning_rate'] = hyperparameters_dict['learning_rate']
         hyperparameters['num_epoch'] = hyperparameters_dict['num_epoch']
-        hyperparameters['time_horizon'] = hyperparameters_dict['time_horizon']
+        data['behaviors']['TouchCube']['time_horizon'] = hyperparameters_dict['time_horizon']
         hyperparameters['epsilon'] = hyperparameters_dict['epsilon']
         hyperparameters['beta'] = hyperparameters_dict['beta']
         config_file.close()
