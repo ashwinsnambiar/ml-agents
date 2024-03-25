@@ -48,12 +48,12 @@ logger = logging_util.get_logger(__name__)
 
 #constants for the optimisation run
 #todo: edit the constants. also N_EVALUATIONS = 2 define in optuna.py too
-N_TRIALS = 100  # Maximum number of trials
+N_TRIALS = 1000  # Maximum number of trials
 #TIMEOUT = int(60 * 15)  # 15 minutes
 N_JOBS = 1 # Number of jobs to run in parallel
 SHOW_PROGRESS_BAR = False
 N_STARTUP_TRIALS = 5  # Stop random sampling after N_STARTUP_TRIALS
-N_EVALUATIONS = 5  # Number of evaluations during the training
+N_EVALUATIONS = 3  # Number of evaluations during the training
 N_EVAL_ENVS = 5
 N_EVAL_EPISODES = 10
 TRAINING_STATUS_FILE_NAME = "training_status.json"
@@ -339,7 +339,7 @@ def start_optuna_tuning(args):
     pruner = MedianPruner(
         n_startup_trials=N_STARTUP_TRIALS, n_warmup_steps=N_EVALUATIONS // 3
     )
-    storage_url = "sqlite:///results/opt1/trial1.db"
+    storage_url = "sqlite:///results/opt2/trial1.db"
     
     study_name = "PPO_Hyperparameters"
     # Create the study and start the hyperparameter optimization
@@ -356,7 +356,7 @@ def start_optuna_tuning(args):
             )
     except KeyboardInterrupt:
         # saving sampler, to restore later if needed. Code to be added later.
-        with open("results/opt1/sampler.pkl", 'wb') as fout:
+        with open("results/opt2/sampler.pkl", 'wb') as fout:
             pickle.dump(study.sampler, fout)
         pass
 

@@ -4,18 +4,24 @@ import yaml
 import optuna
 
 #todo: multiple definition remove
-N_EVALUATIONS = 5
+N_EVALUATIONS = 3
 
 def unity_mlagents_param_sampler(trial: optuna.Trial) -> Dict[str, Any]:
     batch_size = 2 ** trial.suggest_int("batch_size", 5, 10)
     buffer_size = batch_size * trial.suggest_int("buffer_size", 5, 20, step=3)
     learning_rate = trial.suggest_float("learning_rate", 0.00001, 0.1, log=True)
     num_epoch = trial.suggest_int("num_epoch", 3, 8)
+    time_horizon = 2 ** trial.suggest_int("time_horizon", 5, 11)
+    epsilon = 0.1 * trial.suggest_int("epsilon", 1, 3)
+    beta = trial.suggest_float("beta", 0.0001, 0.01, log=True)
     return {
         'batch_size' : batch_size,
         'buffer_size' : buffer_size,
         'learning_rate' : learning_rate,
-        'num_epoch' : num_epoch
+        'num_epoch' : num_epoch,
+        'time_horizon' : time_horizon,
+        'epsilon': epsilon,
+        'beta': beta
     }
 
 
@@ -32,6 +38,10 @@ def update_config_file(trial: optuna.Trial, path):
         hyperparameters['batch_size'] = hyperparameters_dict["batch_size"]
         hyperparameters['buffer_size'] = hyperparameters_dict['buffer_size']
         hyperparameters['learning_rate'] = hyperparameters_dict['learning_rate']
+        hyperparameters['num_epoch'] = hyperparameters_dict['num_epoch']
+        hyperparameters['time_horizon'] = hyperparameters_dict['time_horizon']
+        hyperparameters['epsilon'] = hyperparameters_dict['epsilon']
+        hyperparameters['beta'] = hyperparameters_dict['beta']
         config_file.close()
 
     #todo: stop writing it alphabetically
