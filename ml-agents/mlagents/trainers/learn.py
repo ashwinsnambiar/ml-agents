@@ -341,11 +341,19 @@ def start_optuna_tuning(args):
     )
     storage_url = "sqlite:///results/opt2/trial1.db"
     
+    # For restoring the sampler if initialised with a seed
+    if os.path.isfile("results/opt2/sampler.pkl"):
+        sampler = pickle.load(open("results/opt2/sampler.pkl", "rb"))
+
     study_name = "PPO_Hyperparameters"
     # Create the study and start the hyperparameter optimization
     study = optuna.create_study(storage=storage_url, sampler=sampler, pruner=pruner, 
                                 study_name=study_name, direction="maximize", 
                                 load_if_exists=True)
+    # to retry the failed trials
+    for trial in study.trials:
+        if trial.state == optuna.trial.TrialState.FAIL: 
+            study.enqueue_trial(trial.params)
 
     try:
         study.optimize(
