@@ -75,7 +75,7 @@ setup(
         "onnx==1.12.0",
         "optuna==3.5.0"
     ],
-    python_requires=">=3.10.1,<=3.10.13",
+    python_requires=">=3.10.1,<=3.10.14",
     entry_points={
         "console_scripts": [
             "mlagents-learn=mlagents.trainers.learn:main",

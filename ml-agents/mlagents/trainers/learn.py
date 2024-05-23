@@ -2,6 +2,7 @@
 import pickle
 from mlagents import torch_utils
 import yaml
+import time
 
 import os
 import numpy as np
@@ -52,12 +53,14 @@ N_TRIALS = 1000  # Maximum number of trials
 #TIMEOUT = int(60 * 15)  # 15 minutes
 N_JOBS = 1 # Number of jobs to run in parallel
 SHOW_PROGRESS_BAR = False
-N_STARTUP_TRIALS = 5  # Stop random sampling after N_STARTUP_TRIALS
-N_EVALUATIONS = 3  # Number of evaluations during the training
-N_EVAL_ENVS = 5
-N_EVAL_EPISODES = 10
+N_STARTUP_TRIALS = 5 # Number of trials where pruning is skipped initially
+N_EVALUATIONS = 10  # Number of evaluations during the training
+N_WARMUP_STEPS = 4 # Here, steps indicate the number of pruning evaluation steps in my implementation as I am reporting the eval_index instead of step in RL_Trainer.py
+# N_EVAL_ENVS = 5
+N_MIN_TRIALS = 5 # Min number of trials required at a step to prune
 TRAINING_STATUS_FILE_NAME = "training_status.json"
 
+start_time = time.perf_counter()
 
 def get_version_string() -> str:
     return f""" Version information:
@@ -295,6 +298,10 @@ def objective(trial: optuna.Trial, args) -> float:
     update_config_file(trial, StoreConfigFile.trainer_config_path)
     trial_eval = TrialEvalCallback(trial)
 
+    #define start time
+    start_time = time.perf_counter()
+
+
     #todo: how to initialize the first run with given config file parameters?? 
     
     nan_encountered = False
@@ -318,13 +325,14 @@ def objective(trial: optuna.Trial, args) -> float:
     if nan_encountered:
         return float("nan")
     # print("before should prune in objective")
-    if trial_eval.is_pruned():
-        # print(trial_eval.is_pruned())
-        # print("in should prune in objective")
-        raise optuna.exceptions.TrialPruned()
+    # if trial_eval.is_pruned():
+    #     # print(trial_eval.is_pruned())
+    #     # print("in should prune in objective")
+    #     raise optuna.exceptions.TrialPruned()
     # print("after should prune in objective")
     print(f"{options.checkpoint_settings.run_id} is {trial.user_attrs['last_mean_reward']}")
-    return trial.user_attrs['last_mean_reward']
+    elapsed_time = time.perf_counter() - start_time
+    return trial.user_attrs['last_mean_reward'], elapsed_time
 
 
 def start_optuna_tuning(args):
@@ -337,19 +345,25 @@ def start_optuna_tuning(args):
     sampler = TPESampler(n_startup_trials=N_STARTUP_TRIALS)
     # Do not prune before 1/3 of the max budget is used
     pruner = MedianPruner(
-        n_startup_trials=N_STARTUP_TRIALS, n_warmup_steps=N_EVALUATIONS // 3
+        n_startup_trials=N_STARTUP_TRIALS, n_warmup_steps=N_WARMUP_STEPS, 
+        n_min_trials=N_MIN_TRIALS
     )
-    storage_url = "sqlite:///results/opt2/trial1.db"
+    storage_url = "sqlite:///results/opt1/trial1.db"
     
     # For restoring the sampler if initialised with a seed
-    if os.path.isfile("results/opt2/sampler.pkl"):
-        sampler = pickle.load(open("results/opt2/sampler.pkl", "rb"))
+    if os.path.isfile("results/opt1/sampler.pkl"):
+        sampler = pickle.load(open("results/opt1/sampler.pkl", "rb"))
 
     study_name = "PPO_Hyperparameters"
     # Create the study and start the hyperparameter optimization
-    study = optuna.create_study(storage=storage_url, sampler=sampler, pruner=pruner, 
-                                study_name=study_name, direction="maximize", 
-                                load_if_exists=True)
+    # study = optuna.create_study(storage=storage_url, sampler=sampler, pruner=pruner, 
+    #                             study_name=study_name, direction="maximize", 
+    #                             load_if_exists=True)
+    
+    #Pruning not supported for multi objective funtions
+    study = optuna.create_study(storage=storage_url, sampler=sampler,
+                            study_name=study_name, directions=['maximize', 'minimize'], 
+                            load_if_exists=True)
     # to retry the failed trials
     for trial in study.trials:
         if trial.state == optuna.trial.TrialState.FAIL: 
@@ -364,7 +378,7 @@ def start_optuna_tuning(args):
             )
     except KeyboardInterrupt:
         # saving sampler, to restore later if needed. Code to be added later.
-        with open("results/opt2/sampler.pkl", 'wb') as fout:
+        with open("results/opt1/sampler.pkl", 'wb') as fout:
             pickle.dump(study.sampler, fout)
         pass
 

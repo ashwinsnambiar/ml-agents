@@ -218,7 +218,8 @@ class RLTrainer(Trainer):
         self.stats_reporter.add_stat("Is Training", float(self.should_still_train))
         self.last_mean_reward = self.stats_reporter.get_stats_summaries("Environment/Cumulative Reward").mean
         if self.trial_eval is not None:
-            self.is_pruned = self.trial_eval.trial_eval_callback(self.get_step, self.get_max_steps, self.last_mean_reward)
+            #if self.trial_eval.trial.study.pruner is not None:
+               # self.is_pruned = self.trial_eval.trial_eval_callback(self.get_step, self.get_max_steps, self.last_mean_reward)
             # print("is pruned value in advance ", self.is_pruned)
             self.trial_eval.trial.set_user_attr('last_mean_reward', self.last_mean_reward)
         self.stats_reporter.write_stats(int(step))
@@ -313,7 +314,6 @@ class RLTrainer(Trainer):
         is_pruned attribute is set to true and it is used in the should_still_train()
         method of the parent Trainer class to determine whether to stop training.
         """
-        # print("insiide advance ", trial.number)
         # if trial_eval is not None:
         #     # # print("inside adance if statemnt")
         #     # curr_mean_reward = self._policy_mean_reward()
@@ -326,13 +326,13 @@ class RLTrainer(Trainer):
         #     self.is_pruned = trial_eval.trial_eval_callback(self.get_step, self.get_max_steps, self.last_mean_reward)
         #     # print("is pruned value in advance ", self.is_pruned)
         #     trial_eval.trial.set_user_attr('last_mean_reward', self.last_mean_reward)
-        if self.should_still_train:
-            if self._is_ready_update():
-                with hierarchical_timer("_update_policy"):
-                    if self._update_policy():
-                        for q in self.policy_queues:
-                            # Get policies that correspond to the policy queue in question
-                            q.put(self.get_policy(q.behavior_id))
+        # if self.should_still_train:
+        #     if self._is_ready_update():
+        #         with hierarchical_timer("_update_policy"):
+        #             if self._update_policy():
+        #                 for q in self.policy_queues:
+        #                     # Get policies that correspond to the policy queue in question
+        #                     q.put(self.get_policy(q.behavior_id))
         # elif trial_eval!= None:
         #     # print("inside adance elif statemnt")
         #     last_mean_reward = self.stats_reporter.get_stats_summaries("Environment/Cumulative Reward").mean
